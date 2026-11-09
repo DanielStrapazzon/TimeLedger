@@ -44,6 +44,7 @@
   var state = loadLocal() || emptyState();
   var tab = "hoje";
   var pending = null;
+  var editing = null;
   var showImport = false;
   var flash = { hoje: "", dias: "", folgas: "", conferir: "", ajustes: "" };
   var storageOk = true;
@@ -278,8 +279,13 @@
     else {
       rows.forEach(function (r) {
         h += '<div class="item"><div><div class="mono"><b>' + br(r.iso).slice(0, 5) + '</b> <span class="muted">' + DOW[dateOf(r.iso).getDay()] + '</span></div><div class="mono hint">' + (r.pts.length ? esc(r.pts.join("  ")) : "sem marcações") + '</div></div><div class="right"><div class="mono ' + numCls(r.delta) + '">' + (r.today ? dur(r.worked) : dur(r.delta, true)) + "</div><div>" + pillHtml(r.status, r.label) + "</div>";
+        h += '<button class="link" data-act="edit-day" data-id="' + r.iso + '">Editar</button>';
         if (r.has) h += '<button class="link danger" data-act="del-day" data-id="' + r.iso + '">' + (pending === "d" + r.iso ? "Confirmar" : "Excluir") + "</button>";
         h += "</div></div>";
+        if (editing === r.iso) {
+          h += '<div class="card" style="margin:0 0 .6rem"><div class="field"><label for="ed-times">Horários de ' + br(r.iso) + ' (separe por espaço)</label><input id="ed-times" class="mono" value="' + esc(r.pts.join(" ")) + '" spellcheck="false" autocomplete="off"></div>';
+          h += '<button class="btn" data-act="save-day" data-id="' + r.iso + '">Salvar</button> <button class="link" data-act="cancel-edit">Cancelar</button></div>';
+        }
       });
     }
     h += "</section>";
@@ -455,6 +461,18 @@
       showImport = !showImport; render();
     } else if (act === "import") {
       var ta = document.getElementById("imp"); applyImport(ta ? ta.value : "");
+    } else if (act === "edit-day") {
+      editing = (editing === id ? null : id); render();
+    } else if (act === "cancel-edit") {
+      editing = null; render();
+    } else if (act === "save-day") {
+      var inp = document.getElementById("ed-times"), raw = inp ? inp.value : "";
+      var ts = (raw.match(/\d{1,2}:\d{2}/g) || []).map(function (t) { var p = t.split(":"); return pad(+p[0]) + ":" + p[1]; });
+      var bad = ts.some(function (t) { var p = t.split(":"); return +p[0] > 23 || +p[1] > 59; });
+      if (bad) { say("dias", "Horário inválido. Use hh:mm, de 00:00 a 23:59."); return; }
+      ts = ts.filter(function (t, i) { return ts.indexOf(t) === i; }).sort();
+      if (ts.length) state.punches[id] = ts; else delete state.punches[id];
+      editing = null; commit(); say("dias", "Dia " + br(id) + " salvo.");
     } else if (act === "del-day") {
       if (pending === "d" + id) { delete state.punches[id]; pending = null; commit(); render(); } else { pending = "d" + id; render(); }
     } else if (act === "del-entry") {
