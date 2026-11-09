@@ -1,7 +1,7 @@
 (function () {
   "use strict";
   var KEY = "timeledger.v1";
-  var CATS = { eleitoral: "Créditos eleitorais", ferias: "Férias remuneradas", coletiva: "Folgas coletivas", folga: "Folga do banco de horas" };
+  var CATS = { eleitoral: "Créditos eleitorais", ferias: "Férias remuneradas", coletiva: "Folgas coletivas", folga: "Folga do banco de horas", atestado: "Atestado" };
   var ICONS = {
     hoje: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     dias: '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
@@ -134,8 +134,9 @@
       var d = dateOf(start), last = dateOf(past[past.length - 1]);
       while (d <= last) {
         var iso = isoOf(d), pts = state.punches[iso] || [];
-        var weekend = d.getDay() === 0 || d.getDay() === 6, holiday = !!hol[iso], j = just[iso];
-        var expected = (weekend || holiday || (j && j !== "folga")) ? 0 : daily;
+        var sat = d.getDay() === 6, satMin = +state.settings.sat || 0;
+        var weekend = d.getDay() === 0 || (sat && !satMin), holiday = !!hol[iso], j = just[iso];
+        var expected = (weekend || holiday || (j && j !== "folga")) ? 0 : (sat ? satMin : daily);
         var worked = pairsWorked(pts), odd = pts.length % 2 === 1;
         var delta = worked - expected;
         if (Math.abs(delta) <= tol && expected > 0 && worked > 0) delta = 0;
@@ -194,9 +195,10 @@
     var now = new Date(), iso = isoOf(now), nowM = now.getHours() * 60 + now.getMinutes();
     var pts = state.punches[iso] || [];
     var hol = holidaySet(), just = justifiedDays(hol), j = just[iso];
-    var weekend = now.getDay() === 0 || now.getDay() === 6, holiday = !!hol[iso];
+    var sat = now.getDay() === 6, satMin = +state.settings.sat || 0;
+    var weekend = now.getDay() === 0 || (sat && !satMin), holiday = !!hol[iso];
     var daily = +state.settings.daily || 0;
-    var expected = (weekend || holiday || (j && j !== "folga")) ? 0 : daily;
+    var expected = (weekend || holiday || (j && j !== "folga")) ? 0 : (sat ? satMin : daily);
     var open = pts.length % 2 === 1;
     var worked = pairsWorked(pts);
     if (open) worked += Math.max(0, nowM - toMin(pts[pts.length - 1]));
@@ -288,13 +290,13 @@
     var h = "";
     if (state.example) h += exampleNotice();
     h += '<section class="card"><h2>Novo lançamento</h2>';
-    h += '<div class="field"><label for="f-cat">Conta</label><select id="f-cat"><option value="eleitoral">Créditos eleitorais</option><option value="ferias">Férias remuneradas</option><option value="coletiva">Folgas coletivas</option><option value="folga">Folga do banco de horas</option></select></div>';
+    h += '<div class="field"><label for="f-cat">Conta</label><select id="f-cat"><option value="eleitoral">Créditos eleitorais</option><option value="ferias">Férias remuneradas</option><option value="coletiva">Folgas coletivas</option><option value="folga">Folga do banco de horas</option><option value="atestado">Atestado</option></select></div>';
     h += '<div class="row"><div class="field"><label for="f-kind">Tipo</label><select id="f-kind"><option value="credito">Crédito recebido</option><option value="uso">Dias usados</option></select></div>';
     h += '<div class="field"><label for="f-qty">Dias</label><input type="number" id="f-qty" min="1" step="1" value="1" inputmode="numeric"></div></div>';
     h += '<div class="field"><label for="f-date">Data</label><input type="date" id="f-date" value="' + isoOf(new Date()) + '"></div>';
     h += '<div class="field"><label for="f-note">Observação</label><input type="text" id="f-note" placeholder="Ex.: mesário no 2º turno"></div>';
     h += '<button class="btn" data-act="add-entry">Lançar</button>';
-    h += '<p class="hint">Dias usados contam a partir da data, pulando fins de semana e feriados. A folga do banco de horas aceita só dias usados: o dia deixa de ser falta e as horas saem do banco.</p>';
+    h += '<p class="hint">Dias usados contam a partir da data, pulando fins de semana e feriados. A folga do banco de horas aceita só dias usados: o dia deixa de ser falta e as horas saem do banco. O atestado justifica o dia sem tirar horas.</p>';
     h += '<div class="msg" id="msg-folgas">' + esc(flash.folgas) + "</div></section>";
     h += '<section class="card"><h2>Razão</h2>';
     var list = state.ledger.slice().sort(function (a, b) { return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
@@ -334,6 +336,7 @@
     h += '<section class="card"><h2>Jornada e regras</h2>';
     h += '<div class="row"><div class="field"><label for="s-daily">Jornada diária (horas)</label><input type="text" id="s-daily" inputmode="decimal" value="' + esc((s.daily / 60).toString().replace(".", ",")) + '"></div>';
     h += '<div class="field"><label for="s-tol">Tolerância (min)</label><input type="number" min="0" step="1" id="s-tol" inputmode="numeric" value="' + esc(s.tolerance) + '"></div></div>';
+    h += '<div class="field"><label for="s-sat">Jornada de sábado (horas, 0 se não trabalha)</label><input type="text" id="s-sat" inputmode="decimal" value="' + esc(((s.sat || 0) / 60).toString().replace(".", ",")) + '"></div>';
     h += '<div class="row"><div class="field"><label for="s-open">Saldo anterior do banco</label><input type="text" id="s-open" value="' + esc(dur(s.opening, true)) + '" placeholder="+20:00"></div>';
     h += '<div class="field"><label for="s-start">Contar a partir de</label><input type="date" id="s-start" value="' + esc(s.startDate || "") + '"></div></div>';
     h += '<div class="field"><label for="s-hol">Feriados e pontos facultativos (dd/mm/aaaa)</label><textarea id="s-hol" style="min-height:70px" spellcheck="false">' + esc(s.holidays || "") + "</textarea></div>";
@@ -460,7 +463,7 @@
       var cat = document.getElementById("f-cat").value, kind = document.getElementById("f-kind").value;
       var date = document.getElementById("f-date").value, qty = parseInt(document.getElementById("f-qty").value, 10);
       var note = document.getElementById("f-note").value.trim();
-      if (cat === "folga" && kind === "credito") { say("folgas", "A folga do banco de horas só aceita dias usados."); return; }
+      if ((cat === "folga" || cat === "atestado") && kind === "credito") { say("folgas", "Folga do banco de horas e atestado só aceitam dias usados."); return; }
       if (!date || !(qty >= 1)) { say("folgas", "Informe a data e ao menos 1 dia."); return; }
       state.ledger.push({ id: "l" + Date.now().toString(36) + Math.floor(Math.random() * 1000), cat: cat, kind: kind, date: date, qty: qty, note: note });
       commit(); say("folgas", "Lançamento salvo.");
@@ -470,9 +473,9 @@
       state.official = { date: g("date"), banco: g("banco"), eleitoral: g("eleitoral"), ferias: g("ferias"), coletiva: g("coletiva") };
       commit(); say("conferir", "Comparação atualizada.");
     } else if (act === "save-settings") {
-      var daily = parseDur(document.getElementById("s-daily").value), op = parseDur(document.getElementById("s-open").value || "0");
-      if (daily === null || daily <= 0 || op === null) { say("ajustes", "Confira a jornada (ex.: 8 ou 8:30) e o saldo anterior (ex.: +20:00)."); return; }
-      state.settings = { daily: daily, tolerance: Math.max(0, parseInt(document.getElementById("s-tol").value, 10) || 0), opening: op, startDate: document.getElementById("s-start").value, holidays: document.getElementById("s-hol").value.trim() };
+      var daily = parseDur(document.getElementById("s-daily").value), op = parseDur(document.getElementById("s-open").value || "0"), satv = parseDur(document.getElementById("s-sat").value || "0");
+      if (daily === null || daily <= 0 || op === null || satv === null || satv < 0) { say("ajustes", "Confira a jornada (ex.: 8 ou 8:30) e o saldo anterior (ex.: +20:00)."); return; }
+      state.settings = { daily: daily, sat: satv, tolerance: Math.max(0, parseInt(document.getElementById("s-tol").value, 10) || 0), opening: op, startDate: document.getElementById("s-start").value, holidays: document.getElementById("s-hol").value.trim() };
       commit(); say("ajustes", "Ajustes salvos.");
     } else if (act === "download") {
       downloadBackup();
