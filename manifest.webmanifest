@@ -1,0 +1,15 @@
+{
+  "name": "TimeLedger",
+  "short_name": "TimeLedger",
+  "description": "Controle pessoal de ponto, banco de horas, férias, folgas e créditos eleitorais.",
+  "lang": "pt-BR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef2ef",
+  "theme_color": "#0f6b54",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
